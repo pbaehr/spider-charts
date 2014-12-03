@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="x-ua-compatible" content="IE=9" />
+		<title>Spider Chart Test</title>
+		<script>var usingExCanvas = false;</script><!--[if lt IE 9]><script src="excanvas.min.js"></script><script>usingExCanvas = true;</script><![endif]-->
+		<script src="data.js"></script>
+		<script src="spiderpoint.js"></script>
+		<script src="jquery-1.4.2.min.js"></script>
+		<script>
+			var canvas;
+			var ctx;
+			var points = new Array();
+			var shadeArea = true;
+			var padding=50;
+			
+			function drawWeb()
+			{
+				var numScores = points.length;
+				var angle = 2 * Math.PI / numScores;
+				var offset = canvas.width / 2;
+				
+				ctx.strokeStyle = "#d5d5d5";
+				for(i=1;i<=10;i++)
+				{
+					if(i==10) ctx.strokeStyle = "#666";
+					ctx.beginPath();
+					ctx.arc(offset,offset,(canvas.width-padding*2) / 20 * i,0,2*Math.PI,false);
+					ctx.stroke();
+				}
+				
+				for(i=0;i<numScores;i++)
+				{
+					ctx.beginPath();
+					ctx.moveTo(offset,offset);
+					ctx.lineTo((offset-padding) * Math.cos(angle*(i+1)) + offset, (offset-padding) * Math.sin(angle*(i+1)) + offset);
+					ctx.stroke();
+				}
+			}
+			
+			function drawPoints()
+			{
+				var numScores = points.length;
+				var angle = 2 * Math.PI / numScores;
+				var offset = canvas.width / 2;
+				
+				ctx.fillStyle="#666";
+				for(i=0;i<numScores;i++)
+				{
+					points[i].updatePoint();
+					var curAngle = angle * (i+1);
+					var x = ((canvas.width - padding*2) / 200) * points[i].curX * Math.cos(curAngle) + offset;
+					var y = ((canvas.width - padding*2) / 200) * points[i].curX * Math.sin(curAngle) + offset;
+					ctx.beginPath();
+					ctx.arc(x,y,canvas.width / 150,0,2*Math.PI,false);
+					ctx.fill();
+				}
+				
+				if(shadeArea)
+				{
+					ctx.beginPath();
+					ctx.strokeStyle = "#666";
+					ctx.fillStyle = "rgba(40,63,110,.5)";
+					for(i=0;i<numScores;i++)
+					{
+						var curAngle = angle * (i+1);
+						var smooth_value = 1;
+						
+						var score1 = points[i].curX;
+						
+						var score2;
+						if(i+1 >= numScores) score2 = points[i+1-numScores].curX;
+						else score2 = points[i+1].curX;
+						
+						var score3;
+						if(i+2 >= numScores) score3 = points[i+2-numScores].curX;
+						else score3 = points[i+2].curX;
+						
+						var score0;
+						if(i-1 < 0) score0 = points[numScores-1].curX;
+						else score0 = points[i-1].curX;
+						
+						var x1 = ((canvas.width - padding*2) / 200) * score1 * Math.cos(curAngle) + offset;
+						var y1 = ((canvas.width - padding*2) / 200) * score1 * Math.sin(curAngle) + offset;
+						
+						var x2 = ((canvas.width - padding*2) / 200) * score2 * Math.cos(curAngle+angle) + offset;
+						var y2 = ((canvas.width - padding*2) / 200) * score2 * Math.sin(curAngle+angle) + offset;
+						
+						var x3 = ((canvas.width - padding*2) / 200) * score3 * Math.cos(curAngle+(2*angle)) + offset;
+						var y3 = ((canvas.width - padding*2) / 200) * score3 * Math.sin(curAngle+(2*angle)) + offset;
+						
+						var x0 = ((canvas.width - padding*2) / 200) * score0 * Math.cos(curAngle-angle) + offset;
+						var y0 = ((canvas.width - padding*2) / 200) * score0 * Math.sin(curAngle-angle) + offset;
+						
+						var xc1 = (x0+x1) / 2.0;
+						var yc1 = (y0+y1) / 2.0;
+						var xc2 = (x1+x2) / 2.0;
+						var yc2 = (y1+y2) / 2.0;
+						var xc3 = (x2+x3) / 2.0;
+						var yc3 = (y2+y3) / 2.0;
+						
+						var len1 = Math.sqrt((x1-x0) * (x1-x0) + (y1-y0) * (y1-y0));
+						var len2 = Math.sqrt((x2-x1) * (x2-x1) + (y2-y1) * (y2-y1));
+						var len3 = Math.sqrt((x3-x2) * (x3-x2) + (y3-y2) * (y3-y2));
+						
+						var k1 = len1 / (len1 + len2);
+						var k2 = len2 / (len2 + len3);
+						var xm1 = xc1 + (xc2 - xc1) * k1;
+						var ym1 = yc1 + (yc2 - yc1) * k1;
+						var xm2 = xc2 + (xc3 - xc2) * k2;
+						var ym2 = yc2 + (yc3 - yc2) * k2;
+						
+						var ctrl1_x = xm1 + (xc2 - xm1) * smooth_value + x1 - xm1;
+						var ctrl1_y = ym1 + (yc2 - ym1) * smooth_value + y1 - ym1;
+						var ctrl2_x = xm2 + (xc2 - xm2) * smooth_value + x2 - xm2;
+						var ctrl2_y = ym2 + (yc2 - ym2) * smooth_value + y2 - ym2;
+						
+						if(i==0) ctx.moveTo(((canvas.width - padding*2) / 200) * score1 * Math.cos(curAngle) + offset, ((canvas.width - padding*2) / 200) * score1 * Math.sin(curAngle) + offset);
+						ctx.bezierCurveTo(ctrl1_x, ctrl1_y, ctrl2_x, ctrl2_y, x2, y2);
+					}
+					ctx.stroke();
+					ctx.fill();
+				}
+			}
+			
+			function drawLabels()
+			{
+				var numScores = points.length;
+				var angle = 2 * Math.PI / numScores;
+				var offset = canvas.width / 2;
+				
+				ctx.font = "bold 16px Verdana, sans-serif";
+				ctx.fillStyle = "#283f6e";
+				ctx.textAlign = "left";
+				ctx.textBaseline = "top";
+				ctx.fillText($("#company option:selected").text(),5,5);
+				
+				ctx.fillStyle = "black";
+				ctx.font = "10px Verdana, sans-serif";
+				for(i=0;i<numScores;i++)
+				{
+					var curAngle = angle * (i+1);
+					var x = (canvas.width - padding*2 + 20) / 2 * Math.cos(curAngle) + offset;
+					var y = (canvas.width - padding*2 + 20) / 2 * Math.sin(curAngle) + offset;
+					ctx.textAlign = "left";
+					ctx.textBaseline = "bottom";
+					if(x < offset) ctx.textAlign = "right";
+					if(y > offset) ctx.textBaseline = "top";
+					ctx.fillText(points[i].name,x,y);
+				}
+			}
+			
+			function updateDisplay()
+			{
+				ctx.clearRect(0,0,canvas.width,canvas.height);
+				drawWeb();
+				if(ctx.fillText)
+					drawLabels();
+				drawPoints();
+			}
+			
+			function loadPointsFromData()
+			{
+				var n = $("#company").val();
+				for(i=0;i<data.rankings.item[n].ratings.rating.length;i++)
+				{
+					points[i].targetX = data.rankings.item[n].ratings.rating[i].value;
+				}
+			}
+			
+			function main()
+			{
+				canvas = document.getElementById("spider");
+				ctx = canvas.getContext("2d");
+				
+				loadPointsFromData();
+				
+				setInterval("updateDisplay()",10);
+			}
+			
+			$(document).ready(function()
+			{
+				$("#company").change(function()
+				{
+					loadPointsFromData();
+				});
+				
+				for(i=0;i<data.rankings.item[0].ratings.rating.length;i++)
+				{
+					p = new SpiderPoint(data.rankings.item[0].ratings.rating[i].value,data.rankings.item[0].ratings.rating[i].name);
+					points.push(p);
+				}
+				
+				main();
+			});
+		</script>
+		<style>
+			body
+			{
+				background-color: #f4f1f1;
+				font-family: Verdana, sans-serif;
+				font-size: 11px;
+			}
+			
+			td
+			{
+				padding: 3px;
+				text-align: center;
+				font-size: 10px;
+			}
+			div.section
+			{
+				margin: 34px 20px 20px 20px;
+				padding: 20px;
+				background-color: white;
+				-moz-border-radius: 5px;
+				-webkit-border-radius: 5px;
+				border-radius: 5px;
+				-webkit-box-shadow: 2px 2px 5px #666;
+				-moz-box-shadow: 2px 2px 5px #666;
+				box-shadow: 3px 3px 5px #666;
+				float: left;
+				position: relative;
+			}
+			h2
+			{
+				color: #666;
+				font-size: 14px;
+				margin: 0; padding: 0;
+				position: absolute;
+				top: -23px;
+				left: 5px;
+			}
+			#wrapper
+			{
+				width: 900px;
+				margin: 0 auto;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="wrapper">
+			<div class="section">
+				<h2>Spider Chart</h2>
+				<canvas width="500" height="500" id="spider"></canvas>
+			</div>
+			<div class="section">
+				<h2>Options</h2>
+				<label for="company">Company</label>
+				<select id="company" name="company">
+					<option value="0">McDonald's</option>
+					<option value="1">Burger King</option>
+					<option value="2">Roy Roger's</option>
+					<option value="3">Taco Bell</option>
+					<option value="4">Wendy's</option>
+				</select>
+			</div>
+		</div>
+	</body>
+</html>
